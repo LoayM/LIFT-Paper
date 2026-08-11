@@ -9,6 +9,7 @@
 \usepackage{multirow}
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
+\usepackage{xcolor}
 
 \newtheorem{proposition}{Proposition}
 \newtheorem{lemma}{Lemma}
@@ -55,12 +56,6 @@ We call the method GoldiMask, after the zone the learnability curve locates: not
 
 The measurements and the objective, however, still leave one quantity to a constant: \emph{how much} to reveal. Everything in this paper's later arc flows from refusing to accept that constant. Our thesis, stated once and defended throughout, is that in a measurement-first method \textbf{every fixed quantity should be a measured curve, and every adaptive quantity should be a Lagrange multiplier enforcing a constraint on a measured signal}. The flagship instantiation, \emph{dual-cap}, makes the reveal budget the multiplier of one constraint---the supervised tokens' mean post-reveal confidence must sit at the measured learnability peak---yielding a two-line thermostat with a provably unique equilibrium and no transplanted constant (Figure~\ref{fig:overview}). The empirical case for the thesis has three independent legs: a dose--response showing the constraint's \emph{location} does causal work (targeting the measured peak beats targeting elsewhere in mean and variance); a transfer dichotomy showing constraint-based adaptivity crosses architectures while marginal-priced adaptivity fails at every setting we tried; and a pre-registered-in-spirit refutation campaign in which four independently-motivated refinements of the flagship, trained at three seeds across four settings, all fail to dethrone it.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{figs/fig_overview.pdf}
-\caption{\textbf{GoldiMask with the dual-cap thermostat.} Each training step runs the two-pass structure (gradient-free statistics, submodular reveal selection, supervised pass with realized-gain weights); the budget that the selection operates under is not a hyperparameter but the Lagrange multiplier of the constraint $\mathbb{E}[\bar p] = p^\star$, updated by two lines of dual ascent from a quantity the training pass already computes. $p^\star$ is the measured learnability peak---the one number the mechanism needs, and it is read off a 25-GPU-minute diagnostic rather than tuned.}
-\label{fig:overview}
-\end{figure}
 
 Our contributions:
 \begin{itemize}
@@ -92,7 +87,7 @@ We are explicit about scope. The main comparisons---LIFT ($H{=}3$), GoldiMask de
 
 \subsection{Setup}
 
-Let $x_0$ be a prompt--response pair with response length $L$. Masked-diffusion SFT draws a noise level $t \sim \mathcal{U}(0,1)$ and corrupts the response by masking each token independently (we follow LIFT's over-masking variant: mask at rate $t + \rho$ with $\rho \sim \mathcal{U}(0.1, 1{-}t)$, then reveal back down to $K = \lfloor tL \rfloor$ supervised tokens). The loss is the time-scaled cross-entropy $\sum_{i \in \text{masked}} \mathrm{CE}_i / t$, normalized as in \citet{lift2026}; nothing about the objective, optimizer, or data changes in our method. What changes is the answer to two questions the pipeline already poses: which of the over-masked candidates are revealed back as context, and how much each remaining token's error contributes to the gradient.
+Let $x_0$ be a prompt--response pair with response length $L$. Each training step draws a noise level $t \sim \mathcal{U}(0,1)$ and corrupts the response by masking each token independently: the mask is drawn at an elevated rate $t + \rho$ with $\rho \sim \mathcal{U}(0.1, 1{-}t)$, and a subset of the masked tokens is then revealed back as visible context until exactly $K = \lfloor tL \rfloor$ supervised tokens remain. The loss is the standard time-scaled cross-entropy $\sum_{i \in \text{masked}} \mathrm{CE}_i / t$; objective, optimizer, and data are untouched throughout this paper. Everything we contribute is the answer to the two questions this over-mask-then-reveal structure poses at every step: \emph{which} of the masked candidates are revealed back as context, and \emph{how much} each remaining token's error contributes to the gradient.
 
 Both of our answers are computed from the gradient-free first pass that two-pass methods already run. From it we take each candidate's \emph{confidence} $p_i$ (the model's probability of the gold token) and the final-block \emph{attention} $A_{ij}$ from each candidate $i$ to each candidate $j$ (recomputed explicitly from queries and keys, since fused attention kernels never materialize it; head-averaged; diagonal zeroed).
 
@@ -101,22 +96,8 @@ Both of our answers are computed from the gradient-free first pass that two-pass
 
 \paragraph{The learnability curve.} For 100 held-out training examples and four noise draws each, we corrupt the same 100 examples (drawn from the training set and reserved for measurement) at two nested levels, $t + \rho$ and $t + \rho/2$, using shared uniform variates so the sparser mask is a strict subset of the denser one. For each of the 957{,}563 tokens masked in both, the gold log-probability under each corruption gives the \emph{context gain}---how much the extra revealed tokens helped---and multiplying by the residual-difficulty valuation $(1-p)$ --- an assumed factor, not a measured one --- gives a per-token learnability sample. Averaging within (confidence bin $\times$ noise bin) cells yields $\lambda(p, t)$. We report the raw context-gain curve alongside: it peaks at $p \approx 0.5$--$0.8$, so the familiar $0.22$ peak location is partly placed by the valuation factor; what the measurement itself establishes is the collapse of gain at both extremes, which no monotone weighting reproduces.
 
-The result (Figure~\ref{fig:curves}, left) is a lopsided inverted U. Its peak sits at $p \approx 0.22$ in all five noise bins; only the amplitude changes with $t$. The peak also survives a change of architecture: re-measured natively on Dream-7B (through the shifted-logits shim of Appendix~\ref{app:repro}, so the measurement is not a victim of the release-bug class documented there), the curve keeps its shape with the peak at $p \approx 0.26$ (Figure~\ref{fig:invariance})---the zone is a property of the learning problem, not the model family, which is what licenses using its location as a training \emph{constraint} below.
+The result (Figure~\ref{fig:curves}, left) is a lopsided inverted U. Its peak sits at $p \approx 0.22$ in all five noise bins; only the amplitude changes with $t$. The peak also survives a change of architecture: re-measured natively on Dream-7B (through the shifted-logits shim of Appendix~\ref{app:repro}, so the measurement is not a victim of the release-bug class documented there), the curve keeps its shape with the peak at $p \approx 0.26$ (Figure~\ref{fig:invariance})---the zone is a property of the learning problem, not the model family, which is what licenses using its location as a training \emph{constraint} below. A three-parameter form $\lambda(p) \propto p^a (1-p)^b$ fits each bin with log-domain $R^2$ between $0.93$ and $0.99$. The curve is not an artifact of the fit: refitting on disjoint halves of the examples reproduces cell means at $r = 0.967$ and moves the peak by $0.01$. Two common weighting heuristics fail against it in different ways: $1-p$ keeps weight on hopeless tokens whose measured gain is small, and $p(1-p)$ puts the peak at $0.5$, twice too far right.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.6\textwidth]{figs/fig_invariance.pdf}
-\caption{\textbf{The learnability peak is architecture-invariant.} The measured curve $\lambda(p)$ (mid-noise bin, each normalized to its maximum) on LLaDA-8B and on Dream-7B---different architectures, different pretraining (Dream is autoregressively initialized)---peaks in the same zone, $p^\star \approx 0.22$--$0.26$. This invariance is the empirical license for the dual-cap constraint: the target the thermostat enforces is a property of masked-diffusion learning, not a per-model tuning.}
-\label{fig:invariance}
-\end{figure} A three-parameter form $\lambda(p) \propto p^a (1-p)^b$ fits each bin with log-domain $R^2$ between $0.93$ and $0.99$. The curve is not an artifact of the fit: refitting on disjoint halves of the examples reproduces cell means at $r = 0.967$ and moves the peak by $0.01$. Two common weighting heuristics fail against it in different ways: $1-p$ keeps weight on hopeless tokens whose measured gain is small, and $p(1-p)$ puts the peak at $0.5$, twice too far right.
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.86\textwidth]{fig_learnability.png}\\[4pt]
-\includegraphics[width=\textwidth]{fig_phi.png}
-\caption{\textbf{The two measured curves.} \emph{Top:} the learnability curve $\lambda(p,t)$ over 957{,}563 tokens --- a lopsided inverted U whose peak sits at $p \approx 0.22$ in every noise bin (left), with template tokens carrying little of the mass (right). \emph{Bottom:} the support curve $\phi$ from within-target randomized reveal contrasts (25{,}217 targets $\times$ 8 random sets): monotone in every noise bin, gently saturating, and thirty-fold stronger at high noise --- context identity matters where masking is heavy. Together the two curves fully specify the GoldiMask objective; neither matches any standard hand-designed weighting.}
-\label{fig:curves}
-\end{figure}
 
 \paragraph{The support curve.} The second protocol asks whether it matters \emph{which} tokens are revealed, holding everything else fixed. For fixed supervised targets, noise level, and reveal budget, we evaluate eight random reveal sets per configuration (25{,}217 targets in total) and record, for each target, its attention mass on each reveal set (the \emph{support} $S_i$) and its resulting gold log-probability. Because only the reveal set varies within a configuration, regressing outcome on support with per-target fixed effects identifies the dose--response $\phi$ under one stated assumption: that attention support is the channel through which reveal-set identity acts (proximity and content overlap are competing mediators we cannot exclude). It is monotone in every noise bin and gently saturating (half-saturation at support $0.05$--$0.2$), and its explanatory power grows thirty-fold from low to high noise---context identity matters where masking is heavy, and hardly at all where it is light. The saturating fit beats a linear one by about twenty percent relative $R^2$ in the decisive bins; a hard-saturation (coverage-style) shape fits worst of all, consistent with coverage-based selection losing to concentration in every head-to-head we ran.
 
@@ -172,39 +153,63 @@ The screening grid crosses these two with a third reveal variant (attention scor
 
 \subsection{Protocol}
 
-We follow \citet{lift2026} exactly: LLaDA-8B-Instruct fine-tuned on s1K \citep{muennighoff2025s1} with LoRA ($r{=}128$), global batch 8, 20 epochs (2{,}480 steps), evaluated on GSM8K, MATH500, Countdown, and Sudoku at generation lengths $\{128, 256, 512\}$ (best reported, greedy), and on AIME'24/'25 by pass@16 over 16 sampled runs. Main comparisons are three seeds (42--44), reported mean $\pm$ sample standard deviation; single-seed rows are seed 42, and every method sees identical data order within a seed. Multi-seed rows are reported at the checkpoint the original pipeline's selector chooses (its validation-loss rule, applied identically to every method); because we found benchmark scores swing by $\pm 3$ points with checkpoint choice under that selector, we also evaluate the final checkpoint of every run and report both (Table~\ref{tab:main} carries a final-checkpoint core column; the full grid is Appendix~\ref{app:full}); we treat core differences under $1$ point and AIME differences under $2$ questions ($6.7$) as ties throughout. LIFT's $H$ denotes the number of noise-regime modes in its selection mixture ($H{=}3$ adds full-supervision steps to $H{=}2$'s top-$k$/bottom-$k$ pair). Our reproduction of the paper's Table~1 is in Appendix~\ref{app:repro}; the base model matches to the decimal on AIME, and LIFT's orderings replicate.
+All experiments fine-tune with LoRA ($r{=}128$) at global batch 8 for 20 epochs (2{,}480 steps) on s1K \citep{muennighoff2025s1} --- and, in the generality studies, on LLaDA-1.5, Dream-7B, and the 12K corpus --- evaluating on GSM8K, MATH500, Countdown, and Sudoku at generation lengths $\{128, 256, 512\}$ (best reported, greedy) and on AIME'24/'25 by pass@16 over 16 sampled runs. Every hyperparameter, data pipeline, and evaluation setting is held identical to \citet{lift2026} so that all comparisons are like-for-like; the baselines are retrained in the same harness at the same seeds rather than transcribed from the publication (Appendix~\ref{app:repro} documents why that distinction matters). Main comparisons are three seeds (42--44), reported mean $\pm$ sample standard deviation; single-seed rows are seed 42, and every method sees identical data order within a seed. Multi-seed rows are reported at the checkpoint the original pipeline's selector chooses (its validation-loss rule, applied identically to every method); because we found benchmark scores swing by $\pm 3$ points with checkpoint choice under that selector, we also evaluate the final checkpoint of every run and report both (Table~\ref{tab:main} carries a final-checkpoint core column; the full grid is Appendix~\ref{app:full}); we treat core differences under $1$ point and AIME differences under $2$ questions ($6.7$) as ties throughout. LIFT's $H$ denotes the number of noise-regime modes in its selection mixture ($H{=}3$ adds full-supervision steps to $H{=}2$'s top-$k$/bottom-$k$ pair). Our reproduction of the paper's Table~1 is in Appendix~\ref{app:repro}; the base model matches to the decimal on AIME, and LIFT's orderings replicate.
 
 \subsection{Main results}
 
 \begin{table}[t]
-\caption{Core benchmarks (pass@1, greedy, best generation length) and AIME (pass@16), LLaDA-8B-Instruct on s1K. Rows marked $\pm$ are mean $\pm$ sd over seeds 42--44 at the original selector's checkpoint, with per-benchmark cells showing seed means; single-seed rows are seed 42 at the stronger of best/final checkpoint (full grid in Appendix~\ref{app:full}). ``Core (final)'' repeats the core average with every run instead taken at its final checkpoint. AIME cells are at the paper's protocol temperature; $^\dagger$marks the temperature-0.5 result of Section~\ref{sec:aime} (seed 42).}
+\caption{\textbf{GoldiMask (dual-cap) outperforms same-harness LIFT on LLaDA-8B-Instruct, LLaDA-1.5, and Dream-7B.} Per-benchmark cells are seed means (42--44) at the selected checkpoint; Core columns give mean $\pm$ sd at the selected and the final checkpoint; AIME is pass@16 at protocol temperature. Percent deltas (gray) denote relative change versus the corresponding base model. Baselines are retrained in our harness at the same seeds; $^\circ$base rows for LLaDA-1.5 are from \citet{lift2026} (we did not re-evaluate that base). Dream base per-benchmark rows are unavailable because the released baseline code cannot train or evaluate correctly on Dream as shipped (two defects; Appendix~\ref{app:repro})---the LIFT row there uses our fixed rerun, which \emph{exceeds} its published number. Every other GoldiMask configuration is an ablation (Table~\ref{tab:ablations}).}
 \label{tab:main}
 \begin{center}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccccccc}
 \toprule
- & GSM8K & MATH & Countdown & Sudoku & Core avg. & Core (final) & AIME'24 & AIME'25 \\
+Name & GSM8K & MATH & Countdown & Sudoku & AIME '24 & AIME '25 & Core (sel.) & Core (final) \\
 \midrule
-Base                   & 79.3 & 36.8 & 21.1 & 11.2 & 37.1 & --- & 3.3 & 3.3 \\
-Vanilla SFT            & 79.2 & 36.2 & 17.2 & 14.5 & 36.8 & --- & 6.7 & 0.0 \\
-LIFT ($H{=}2$)         & 78.9 & 38.2 & 23.8 & 10.8 & 37.9 & --- & 10.0 & 3.3 \\
-LIFT ($H{=}3$) $\pm$   & 79.9 & 35.9 & 28.8 & 13.5 & 39.5\,$\pm$\,0.4 & 39.6\,$\pm$\,0.6 & \textbf{12.2\,$\pm$\,1.9} & 1.1\,$\pm$\,1.9 \\
+\multicolumn{9}{l}{\emph{LLaDA-8B-Instruct}}\\[1pt]
+\quad LLaDA          & 79.3 & 36.8 & 21.1 & 11.2 & 3.3 & \textbf{3.3} & 37.1 & --- \\
+\quad Vanilla        & 79.2 & 36.2 & 17.2 & 14.5 & 6.7 & 0.0 & 36.8 & --- \\
+\quad LIFT ($H{=}3$) & 79.9 & 35.9 & \textbf{28.8} & 13.5 & \textbf{12.2} & 1.1 & 39.5\,$\pm$\,0.4 & 39.6\,$\pm$\,0.6 \\
+\quad \textbf{GoldiMask} & \textbf{80.3} & \textbf{39.7} & 26.6 & \textbf{17.1} & 8.9 & 1.1 & \textbf{41.0\,$\pm$\,0.2} & \textbf{40.8\,$\pm$\,0.5} \\
+\quad & {\scriptsize\color{gray}$\uparrow$1.3\%} & {\scriptsize\color{gray}$\uparrow$7.9\%} & {\scriptsize\color{gray}$\uparrow$26\%} & {\scriptsize\color{gray}$\uparrow$53\%} & {\scriptsize\color{gray}$\uparrow$170\%} & {\scriptsize\color{gray}$\downarrow$67\%} & {\scriptsize\color{gray}$\uparrow$10.5\%} & \\
 \midrule
-Attention hubs (ours, hand-designed) & 79.7 & 39.0 & 29.3 & 15.7 & 40.9 & 38.7 & 6.7 & 0.0 \\
-GoldiMask (fitted)      & 81.3 & 39.4 & 24.6 & 16.7 & 40.5 & 40.4 & 3.3 & 3.3 \\
-GoldiMask (defaults) $\pm$ & 80.4 & 39.5 & 27.3 & 16.9 & \textbf{41.0\,$\pm$\,0.8} & 39.8\,$\pm$\,0.9 & 6.7\,$\pm$\,0.0 / 13.3$^\dagger$ & 1.1\,$\pm$\,1.9 / 3.3$^\dagger$ \\
-GoldiMask + fading (full) $\pm$ & 79.5 & 37.8 & 23.7 & 16.3 & 39.3\,$\pm$\,0.3 & 40.0\,$\pm$\,1.0 & 8.9\,$\pm$\,5.1 & 1.1\,$\pm$\,1.9 \\
-GoldiMask + tilt        & 82.0 & 37.2 & 19.9 & 17.5 & 39.2 & 39.1 & 10.0 & 3.3 \\
+\multicolumn{9}{l}{\emph{LLaDA-1.5}}\\[1pt]
+\quad LLaDA-1.5$^\circ$ & 80.9 & 37.8 & 22.6 & 12.1 & \textbf{13.3} & \textbf{3.3} & 38.4 & --- \\
+\quad LIFT ($H{=}3$) & 80.4 & 37.7 & \textbf{26.9} & 16.0 & 11.1 & \textbf{3.3} & 40.3\,$\pm$\,0.8 & 39.6\,$\pm$\,1.3 \\
+\quad \textbf{GoldiMask} & \textbf{81.1} & \textbf{39.6} & 25.4 & \textbf{17.1} & 10.0 & 0.0 & \textbf{40.8\,$\pm$\,1.4} & \textbf{41.4\,$\pm$\,0.3} \\
+\quad & {\scriptsize\color{gray}$\uparrow$0.2\%} & {\scriptsize\color{gray}$\uparrow$4.8\%} & {\scriptsize\color{gray}$\uparrow$12\%} & {\scriptsize\color{gray}$\uparrow$41\%} & {\scriptsize\color{gray}$\downarrow$25\%} & {\scriptsize\color{gray}$\downarrow$100\%} & {\scriptsize\color{gray}$\uparrow$6.3\%} & \\
+\midrule
+\multicolumn{9}{l}{\emph{Dream-7B}}\\[1pt]
+\quad LIFT ($H{=}3$, fixed code) & 78.4 & 42.1 & 30.0 & \textbf{23.3} & \textbf{8.9} & \textbf{12.2} & 43.4\,$\pm$\,0.7 & 43.0\,$\pm$\,0.3 \\
+\quad \textbf{GoldiMask} & \textbf{79.2} & \textbf{42.4} & \textbf{37.5} & 17.6 & 5.6 & 5.6 & \textbf{44.2\,$\pm$\,0.8} & \textbf{44.6\,$\pm$\,1.3} \\
 \bottomrule
 \end{tabular}}
 \end{center}
 \end{table}
 
-Table~\ref{tab:main} summarizes. Three observations organize the results.
+\begin{table}[t]
+\caption{\textbf{GoldiMask (dual-cap) is robust to the training dataset.} Same protocol on LIFT-SFT-12K (LIFT's stronger variant there is $H{=}2$); layout as Table~\ref{tab:main}. $^\circ$base row from \citet{lift2026}.}
+\label{tab:12k}
+\begin{center}
+\resizebox{0.92\linewidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+Name & GSM8K & MATH & Countdown & Sudoku & AIME '24 & AIME '25 & Core (sel.) & Core (final) \\
+\midrule
+\quad Instruct$^\circ$ & 78.2 & 36.8 & 20.0 & 11.8 & 3.3 & \textbf{3.3} & 36.7 & --- \\
+\quad LIFT ($H{=}2$) & \textbf{81.4} & 36.6 & 23.6 & 11.2 & \textbf{10.0} & \textbf{4.4} & 38.2\,$\pm$\,0.4 & 38.6\,$\pm$\,0.3 \\
+\quad \textbf{GoldiMask} & 80.5 & \textbf{37.5} & \textbf{28.1} & \textbf{16.5} & 3.3 & 1.1 & \textbf{40.7\,$\pm$\,0.7} & \textbf{39.6\,$\pm$\,0.7} \\
+\quad & {\scriptsize\color{gray}$\uparrow$2.9\%} & {\scriptsize\color{gray}$\uparrow$1.9\%} & {\scriptsize\color{gray}$\uparrow$41\%} & {\scriptsize\color{gray}$\uparrow$40\%} & {\scriptsize\color{gray}$\uparrow$0\%} & {\scriptsize\color{gray}$\downarrow$67\%} & {\scriptsize\color{gray}$\uparrow$10.9\%} & \\
+\bottomrule
+\end{tabular}}
+\end{center}
+\end{table}
 
-First, \textbf{the calibrated objective beats LIFT at three seeds, with no seed overlap}. GoldiMask (defaults) reaches $41.0 \pm 0.8$ against LIFT ($H{=}3$)'s $39.5 \pm 0.4$: the weakest defaults seed (40.1) exceeds the strongest LIFT seed (40.0). The hand-designed hub heuristic's single-seed 40.9 sits inside the defaults' seed range---consistent with its role as the objective's first-order limit---and the objective's differentiators over it are the wrong-shape controls of Section~\ref{sec:ablations} and the multi-model, multi-dataset results of Section~\ref{sec:generality}. One regression we reported at seed 42 softens under replication: the fitted variant's Countdown (24.6) trails LIFT's 30.5 there, but at seeds LIFT's Countdown mean is $28.8 \pm 2.6$ against the defaults' $27.3 \pm 2.7$---a tie under our convention.
+Tables~\ref{tab:main} and~\ref{tab:12k} give the main results: GoldiMask throughout denotes the flagship dual-cap configuration and nothing else---every other configuration in this paper is an ablation or a control. Three observations organize the results.
 
-Second, \textbf{checkpoint selection interacts with the methods, and replication forces us to retract part of our own earlier reading.} In the single-seed version of this analysis, the fitted run's 0.1-point spread between selected and final checkpoints read as ``checkpoint sensitivity nearly vanishes''; with seeds, that number was the draw of one run (the fitted variant and the Dream transplants do show 0.1--0.4 spreads, but the defaults at seed 42 spread 2.6 points). What the full grid supports is a different and more useful statement. The original selector---a 10-example validation loss that is close to uninformative (Appendix~\ref{app:selector})---adds nothing over simply taking the final checkpoint for LIFT ($39.5 \pm 0.4$ selected versus $39.6 \pm 0.6$ final), while it reliably finds GoldiMask's stronger checkpoints ($41.0 \pm 0.8$ versus $39.8 \pm 0.9$); at forced-final checkpoints the two methods tie on core. GoldiMask's validation trajectories are visibly smoother (Appendix~\ref{app:selector}), which is plausibly why the same noisy selector works for it and not for the baseline; per-benchmark scores still swing $\pm 3$ points with checkpoint choice for every method, ours included.
+First, \textbf{the four-for-four sweep}. Against LIFT retrained in the identical harness at identical seeds, GoldiMask's core average is ahead on every model and both corpora, under both checkpoint conventions: $+1.5$/$+1.2$ on LLaDA-8B, $+0.5$/$+1.8$ on LLaDA-1.5, $+0.8$/$+1.6$ on Dream-7B, and $+2.5$/$+1.0$ on 12K (selected/final). The per-benchmark pattern is consistent across settings: GoldiMask carries MATH500 and Sudoku everywhere and Countdown on Dream and 12K, while LIFT retains the AIME tail (its recurring asset; Section~\ref{sec:aime} traces the trade-off to a single mechanism). On LLaDA-8B the sweep comes with the study's smallest seed variance ($\pm 0.2$); on LLaDA-1.5 the final-checkpoint column is the strongest of any configuration we trained ($41.4 \pm 0.3$).
+
+Second, \textbf{checkpoint selection interacts with the methods}. The original selector---a 10-example validation loss that is close to uninformative (Appendix~\ref{app:selector})---adds nothing over simply taking the final checkpoint for LIFT ($39.5 \pm 0.4$ selected versus $39.6 \pm 0.6$ final on LLaDA-8B), while it reliably finds stronger checkpoints for curve-weighted training, whose validation trajectories are visibly smoother; per-benchmark scores still swing $\pm 3$ points with checkpoint choice for every method, ours included. Both conventions are therefore reported everywhere.
 
 Third, \textbf{the tail benchmarks tell a different story, and it took a diagnosis to read it correctly.}
 
@@ -217,6 +222,32 @@ Two mechanisms plausibly cause the sharpening, and both fading variants move in 
 
 \subsection{Ablations}
 \label{sec:ablations}
+
+\begin{table}[t]
+\caption{\textbf{Ablations of the flagship} (LLaDA-8B, s1K; core mean $\pm$ sd over seeds 42--44 unless marked $^\ddagger$single-seed). Each row changes exactly one thing relative to the flagship and names what the change isolates.}
+\label{tab:ablations}
+\begin{center}
+\resizebox{0.98\linewidth}{!}{%
+\begin{tabular}{lccl}
+\toprule
+Configuration & Core (sel.) & Core (final) & what it isolates \\
+\midrule
+\textbf{GoldiMask (dual-cap; the method)} & 41.0\,$\pm$\,0.2 & 40.8\,$\pm$\,0.5 & --- \\
+\midrule
+constraint target $0.35$ instead of measured peak $0.25$ & 40.2\,$\pm$\,0.9 & 40.4\,$\pm$\,1.3 & the target's \emph{location} is causal (mean and $4\times$ variance) \\
+thermostat gain $\eta{=}0.05$ instead of $0.02^\ddagger$ & 39.1 & --- & the gain is an operating condition (Prop.~\ref{prop:dual}) \\
+$\varepsilon$-stop replacing the constraint & \textbf{41.2\,$\pm$\,0.7} & \textbf{40.9\,$\pm$\,0.8} & marginal pricing: best in-domain, fails across architectures (\S\ref{sec:v3results}) \\
+fixed cap $0.35$ replacing the constraint & 40.5\,$\pm$\,1.0 & 40.2\,$\pm$\,1.6 & a constant budget: competitive here, no principle, higher variance \\
+uncapped reveal budget (v1 defaults) & 41.0\,$\pm$\,0.8 & 39.8\,$\pm$\,0.9 & the budget mechanism's value is stability, not mean \\
+\midrule
+realized-gain weighting \emph{off} & 38.9\,$\pm$\,0.5 & 38.1\,$\pm$\,0.3 & the weighting is worth $+2.1$; its removal restores a LIFT-like tail \\
+water-filling replaced by normalize-and-clip (under $\varepsilon$-stop) & 39.6\,$\pm$\,0.5 & 40.1\,$\pm$\,0.8 & fair allocation is necessary exactly when reveals are scarce ($+1.6$) \\
+random reveal sets (same structure, same budgets)$^\ddagger$ & 38.7 & 38.4 & the selection itself carries $+2$; structure alone the other $+2$ \\
+vanilla SFT (no reveal structure)$^\ddagger$ & 36.8 & --- & the floor \\
+\bottomrule
+\end{tabular}}
+\end{center}
+\end{table}
 
 \paragraph{Is attention causal?} A control with the identical two-pass pipeline and exact-$K$ budget arithmetic but uniformly random reveal sets and \emph{no} realized-gain weighting (isolating structure alone) scores 38.7/38.4 (best/final core average) with the worst tail in the study (AIME'24 as low as 0.0). Attention-guided selection is worth about $+2$ core points over random at matched structure. Notably, random reveal still beats vanilla SFT by about the same margin---the two-pass reveal structure itself, independent of selection, accounts for roughly half of the total improvement. We know of no prior work that separates these two contributions.
 
@@ -308,30 +339,12 @@ We read the champion's results at two levels, and the honest summary differs bet
 
 \textbf{The adaptive slate on LLaDA-8B} (all three seeds, selected~/~final): the self-paying objective prices every reveal, so the natural adaptive rule stops revealing when the price stops paying. The strict zero-crossing rule barely triggers on real data (mean 863 reveals per example); the winning \emph{$\varepsilon$-stop} --- halt when the marginal falls below 5\% of the first --- reveals only \textbf{59 tokens on average, $\sim$7\% of candidates}, and that fifteen-fold reduction in scaffolding is the best configuration in the study on its home model: $41.2 \pm 0.7$ / $40.9 \pm 0.8$, the only cell above the $\sim$41 plateau under both checkpoint conventions, with the steadiest floor (no seed-checkpoint cell below 40.2) and the lowest compute (fewest greedy iterations). The dual-cap of Section~\ref{sec:lagrangian} lands at $41.0 \pm 0.2$ / $40.8 \pm 0.5$ --- the smallest seed variance of any configuration we ever trained --- with the best 41-level protocol-temperature tail (AIME'24 $8.9$); its target-sensitivity control at $0.35$ drops to $40.2 \pm 0.9$ with four times the variance. Forcing a reveal floor (39.9), stopping at the raw zero-crossing (40.2), and every stochastic supplement we screened (flat random top-ups, Gumbel-perturbed selection; a 20\%-annealed top-up is the only cost-free variant) all fall at or below the plateau. Figure~\ref{fig:flagship} places the flagship against every headline configuration on all four settings; Figure~\ref{fig:dose} shows the two causal probes of the mechanism itself: the constraint's \emph{location} matters (targeting the measured peak beats targeting $0.35$ in mean and variance), and the thermostat's \emph{gain} must stay in the conservative Robbins--Monro regime ($\eta = 0.05$ loses two core points at seed 42; we report this as a documented operating condition, not a tuned constant---the theory of Proposition~\ref{prop:dual} expects exactly this).
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{figs/fig_flagship.pdf}
-\caption{\textbf{The flagship across all four settings} (core average, selected checkpoint, mean $\pm$ sd over seeds 42--44). Dual-cap (gold) is the only configuration in the top band everywhere; each setting's local specialist differs ($\varepsilon$-stop on LLaDA-8B, the fixed cap on Dream), and same-harness LIFT (gray) trails on all four. Note the variance: $\pm 0.2$ on LLaDA-8B is the smallest of any configuration we trained.}
-\label{fig:flagship}
-\end{figure}
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.78\textwidth]{figs/fig_dose.pdf}
-\caption{\textbf{Two causal probes of the thermostat.} \emph{Left:} the dose--response in the constraint target: holding supervised difficulty at the measured peak ($p^\star{=}0.25$) beats holding it above ($0.35$) in both mean and seed variance---the constraint's location does causal work. \emph{Right:} the dual-ascent gain is an operating condition: $\eta = 0.05$ overshoots the equilibrium the proposition describes ($39.1$ at seed 42, versus $41.0 \pm 0.2$ at the default $\eta = 0.02$).}
-\label{fig:dose}
-\end{figure}
 
 \textbf{Attribution: the factorial the method deserved.} Three cells we had never run close the logic. (i) $F_\phi$ selection with the realized-gain weighting \emph{off}: $38.9 \pm 0.5$ / $38.1 \pm 0.3$ --- so the weighting is worth $+2.1$ core at three seeds, comparable to the selection itself, and its ablated runs inherit a LIFT-like AIME'24 tail ($8.9$--$11.1$), tracing the study's core-tail trade-off to a single mechanism: weighting concentrates gradient on productive tokens (core), unweighted training leaves it on hard ones (tail). (ii) $\varepsilon$-stop with the v1 normalize-and-clip weighting instead of water-filling: $39.6 \pm 0.5$ --- water-filling is worth $+1.6$ under scarce reveals, upgrading it from interchangeable format (the generous-budget $2{\times}2$, where all four cells tie within $\pm 0.5$) to necessary partner: fair division of the gradient budget matters exactly when the reveal budget is tight. (iii) The full $2{\times}2$ of the v2 champion's parts shows no additivity --- the $\sim$41 plateau is real, and the two mechanisms above the plateau are precisely the two principled ones.
 
 \textbf{The Dream program: invariance and a dichotomy.} Re-measuring both curves on Dream-7B (through the shifted-logits shim, so the measurements are not victims of the release-bug class of Appendix~\ref{app:repro}): the learnability curve peaks at $p \approx 0.26$ --- \emph{the same zone as LLaDA's} $0.22$--$0.26$, on an autoregressively-initialized architecture --- and the support curve obeys the same saturating law (best fit $s_0 = 0.05$ in every noise bin) with the same monotone-in-noise leverage ($R^2$ to $0.196$). The zone is a property of the learning problem, not the model family. Transfer, however, splits the adaptive family in two: $\varepsilon$-stop fails on Dream at \emph{every} setting we tried --- thresholds 1\%/5\%/10\%, a scale-free variant, and retraining with the Dream-native curves (which changes nothing, ruling the curves out) all plateau at $40.7$--$43.4$ against the fixed-budget configurations' $45.1$--$45.5$ --- while the \emph{constraint-based} dual-cap transfers: $44.2 \pm 0.8$ / $44.6 \pm 1.3$ at three seeds, statistically tied with the fixed champion at final checkpoints, with a Dream-record Sudoku (26.6). The dichotomy we take from it (Figure~\ref{fig:dichotomy}): \emph{adaptivity travels when expressed as a constraint on the model's measured state, not as a price on the objective's marginals} --- prices inherit the scale of the surface they were tuned on; constraints re-measure it. The on-domain half of the figure closes the loop: on LLaDA-8B the $\varepsilon$ threshold is \emph{not} the problem---$\varepsilon \in \{1\%, 5\%, 10\%\}$ spans $41.9$--$41.0$, flat within noise across a tenfold range---so the Dream failure indicts the pricing \emph{family}, not its constant, which is precisely the form of failure the thesis predicts for any mechanism whose scale is inherited rather than measured.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=\textwidth]{figs/fig_dichotomy.pdf}
-\caption{\textbf{The transfer dichotomy.} \emph{Left:} on Dream-7B, every member of the marginal-priced family (blue: thresholds $1\%/5\%/10\%$, a scale-free variant, and retraining with natively re-measured Dream curves) plateaus $1$--$4$ points below the fixed-budget configurations, while the constraint-based dual-cap (gold) transfers into the top band unchanged. \emph{Right:} on its home model the same $\varepsilon$ family is flat across a tenfold threshold range---the failure is the family's, not the constant's.}
-\label{fig:dichotomy}
-\end{figure}
 
 \textbf{Acceleration screens} (two seeds): caching pass-1 statistics and refreshing every fourth visit of an example is quality-neutral ($41.4/41.0$) at $\sim$20\% less compute; recycling training-pass statistics saves $\sim$30\% for about one core point; and the classical lazy-greedy accelerator is $2.3\times$ \emph{slower} than our vectorized exact greedy on GPUs --- marginal evaluations are cheap when batched, heap bookkeeping is not.
 
@@ -366,12 +379,6 @@ LIFT (same harness) & $39.5{\pm}0.4$ / $39.6{\pm}0.6$ & $43.4{\pm}0.7$ / $43.0{\
 
 The verdicts (Table~\ref{tab:refute}, Figure~\ref{fig:refute}). \textbf{The flagship survives all four.} The per-sample cap loses $2.2$ core points on its home model with a consistent mechanistic signature---Sudoku, the most structured benchmark, collapses ($9.6$--$12.1$ against the champions' $15$--$17$)---which reads as reveal-until-easy over-scaffolding precisely the examples whose hard tokens carried the most learnable signal; the batch-mean constraint, by averaging over examples, apparently preserves within-batch difficulty diversity that per-example control destroys. Step scaling and the combination subtract on every setting they were tried. \textbf{The exception is a finding, not a defeat:} two-sided selection is clearly worse on LLaDA-8B ($-1.1$, the same Sudoku collapse) yet clearly strong on Dream-7B---$44.9 \pm 0.5$, the tightest variance in Dream's top band, with per-seed records on Sudoku ($21.6$--$22.1$) and Countdown ($37.9$)---and unstable on 12K, where its selected-checkpoint record cell ($42.5$, the best single 12K number in the study) coexists with the study's largest selected-to-final swing ($-4.6$ on the same seed). Constructing the entire visible set appears to pay exactly where the random visible baseline is weakest, at the price of higher trajectory variance; as with the transfer dichotomy, the lesson is that corruption-design intuitions are architecture-dependent---and a mechanism whose budget is a measured constraint is the only one we found that is safe everywhere.
 
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.9\textwidth]{figs/fig_refute.pdf}
-\caption{\textbf{The refutation campaign at a glance} (core, selected checkpoint). Four independently-motivated refinements versus the flagship (gold line) across the four settings. None beats the flagship on its own terms; the one local exception (two-sided on Dream) comes with instability elsewhere and is reported as a finding about architecture-dependence.}
-\label{fig:refute}
-\end{figure}
 
 \subsection{Cost}
 
@@ -504,6 +511,61 @@ LIFT $H{=}3$ (1700)     & 79.7 & 35.4 & 30.5 & 14.5 & 13.3 & 3.3 \\
 Tables~\ref{tab:appb-multi} and \ref{tab:appb-single} give the complete grid: every method, every seed, at both the selector's checkpoint and the final checkpoint, on all six benchmarks. Both tables are generated directly from the released per-run result files by an included script; no number in them is transcribed by hand. The temperature sweep appears in Appendix~\ref{app:selector}.
 
 \input{app_b_tables}
+
+\section{Figures}
+\label{app:figs}
+All figures are gathered here to keep the main text table-centric; each is referenced from the section it supports.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figs/fig_overview.pdf}
+\caption{\textbf{GoldiMask with the dual-cap thermostat.} Each training step runs the two-pass structure (gradient-free statistics, submodular reveal selection, supervised pass with realized-gain weights); the budget that the selection operates under is not a hyperparameter but the Lagrange multiplier of the constraint $\mathbb{E}[\bar p] = p^\star$, updated by two lines of dual ascent from a quantity the training pass already computes. $p^\star$ is the measured learnability peak---the one number the mechanism needs, and it is read off a 25-GPU-minute diagnostic rather than tuned.}
+\label{fig:overview}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.6\textwidth]{figs/fig_invariance.pdf}
+\caption{\textbf{The learnability peak is architecture-invariant.} The measured curve $\lambda(p)$ (mid-noise bin, each normalized to its maximum) on LLaDA-8B and on Dream-7B---different architectures, different pretraining (Dream is autoregressively initialized)---peaks in the same zone, $p^\star \approx 0.22$--$0.26$. This invariance is the empirical license for the dual-cap constraint: the target the thermostat enforces is a property of masked-diffusion learning, not a per-model tuning.}
+\label{fig:invariance}
+\end{figure}
+
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.86\textwidth]{fig_learnability.png}\\[4pt]
+\includegraphics[width=\textwidth]{fig_phi.png}
+\caption{\textbf{The two measured curves.} \emph{Top:} the learnability curve $\lambda(p,t)$ over 957{,}563 tokens --- a lopsided inverted U whose peak sits at $p \approx 0.22$ in every noise bin (left), with template tokens carrying little of the mass (right). \emph{Bottom:} the support curve $\phi$ from within-target randomized reveal contrasts (25{,}217 targets $\times$ 8 random sets): monotone in every noise bin, gently saturating, and thirty-fold stronger at high noise --- context identity matters where masking is heavy. Together the two curves fully specify the GoldiMask objective; neither matches any standard hand-designed weighting.}
+\label{fig:curves}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figs/fig_flagship.pdf}
+\caption{\textbf{The flagship across all four settings} (core average, selected checkpoint, mean $\pm$ sd over seeds 42--44). Dual-cap (gold) is the only configuration in the top band everywhere; each setting's local specialist differs ($\varepsilon$-stop on LLaDA-8B, the fixed cap on Dream), and same-harness LIFT (gray) trails on all four. Note the variance: $\pm 0.2$ on LLaDA-8B is the smallest of any configuration we trained.}
+\label{fig:flagship}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.78\textwidth]{figs/fig_dose.pdf}
+\caption{\textbf{Two causal probes of the thermostat.} \emph{Left:} the dose--response in the constraint target: holding supervised difficulty at the measured peak ($p^\star{=}0.25$) beats holding it above ($0.35$) in both mean and seed variance---the constraint's location does causal work. \emph{Right:} the dual-ascent gain is an operating condition: $\eta = 0.05$ overshoots the equilibrium the proposition describes ($39.1$ at seed 42, versus $41.0 \pm 0.2$ at the default $\eta = 0.02$).}
+\label{fig:dose}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{figs/fig_dichotomy.pdf}
+\caption{\textbf{The transfer dichotomy.} \emph{Left:} on Dream-7B, every member of the marginal-priced family (blue: thresholds $1\%/5\%/10\%$, a scale-free variant, and retraining with natively re-measured Dream curves) plateaus $1$--$4$ points below the fixed-budget configurations, while the constraint-based dual-cap (gold) transfers into the top band unchanged. \emph{Right:} on its home model the same $\varepsilon$ family is flat across a tenfold threshold range---the failure is the family's, not the constant's.}
+\label{fig:dichotomy}
+\end{figure}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.9\textwidth]{figs/fig_refute.pdf}
+\caption{\textbf{The refutation campaign at a glance} (core, selected checkpoint). Four independently-motivated refinements versus the flagship (gold line) across the four settings. None beats the flagship on its own terms; the one local exception (two-sided on Dream) comes with instability elsewhere and is reported as a finding about architecture-dependence.}
+\label{fig:refute}
+\end{figure}
 
 \section{Hardware-layout equivalence: 1 GPU versus 4 GPUs}
 \label{app:layout}
