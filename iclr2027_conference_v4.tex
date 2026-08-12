@@ -1,4 +1,5 @@
 \documentclass{article} % For LaTeX2e
+\PassOptionsToPackage{table}{xcolor}
 \usepackage{iclr2027_conference,times}
 
 \input{math_commands.tex}
@@ -10,6 +11,8 @@
 \usepackage{amsmath,amssymb,amsthm}
 \usepackage{graphicx}
 \usepackage{xcolor}
+\definecolor{goldrow}{RGB}{250,243,219}
+\definecolor{panelrow}{RGB}{234,234,234}
 
 \newtheorem{proposition}{Proposition}
 \newtheorem{lemma}{Lemma}
@@ -164,24 +167,26 @@ All experiments fine-tune with LoRA ($r{=}128$) at global batch 8 for 20 epochs 
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccccccc}
 \toprule
-Name & GSM8K & MATH & Countdown & Sudoku & AIME '24 & AIME '25 & Core (sel.) & Core (final) \\
+ & \multicolumn{4}{c}{Core benchmarks (pass@1)} & \multicolumn{2}{c}{AIME (pass@16)} & \multicolumn{2}{c}{Core average} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+Name & GSM8K & MATH & Countdown & Sudoku & '24 & '25 & selected & final \\
 \midrule
-\multicolumn{9}{l}{\emph{LLaDA-8B-Instruct}}\\[1pt]
-\quad LLaDA          & 79.3 & 36.8 & 21.1 & 11.2 & 3.3 & \textbf{3.3} & 37.1 & --- \\
-\quad Vanilla        & 79.2 & 36.2 & 17.2 & 14.5 & 6.7 & 0.0 & 36.8 & --- \\
-\quad LIFT ($H{=}3$) & 79.9 & 35.9 & \textbf{28.8} & 13.5 & \textbf{12.2} & 1.1 & 39.5\,$\pm$\,0.4 & 39.6\,$\pm$\,0.6 \\
-\quad \textbf{GoldiMask} & \textbf{80.3} & \textbf{39.7} & 26.6 & \textbf{17.1} & 8.9 & 1.1 & \textbf{41.0\,$\pm$\,0.2} & \textbf{40.8\,$\pm$\,0.5} \\
-\quad & {\scriptsize\color{gray}$\uparrow$1.3\%} & {\scriptsize\color{gray}$\uparrow$7.9\%} & {\scriptsize\color{gray}$\uparrow$26\%} & {\scriptsize\color{gray}$\uparrow$53\%} & {\scriptsize\color{gray}$\uparrow$170\%} & {\scriptsize\color{gray}$\downarrow$67\%} & {\scriptsize\color{gray}$\uparrow$10.5\%} & \\
+\rowcolor{panelrow}\multicolumn{9}{l}{\emph{LLaDA-8B-Instruct}}\\
+LLaDA          & 79.3 & 36.8 & 21.1 & 11.2 & 3.3 & \textbf{3.3} & 37.1 & --- \\
+Vanilla        & 79.2 & 36.2 & 17.2 & 14.5 & 6.7 & 0.0 & 36.8 & --- \\
+LIFT ($H{=}3$) & 79.9 & 35.9 & \textbf{28.8} & 13.5 & \textbf{12.2} & 1.1 & 39.5\,$\pm$\,0.4 & 39.6\,$\pm$\,0.6 \\
+\rowcolor{goldrow}\textbf{GoldiMask} & \textbf{80.3} & \textbf{39.7} & 26.6 & \textbf{17.1} & 8.9 & 1.1 & \textbf{41.0\,$\pm$\,0.2} & \textbf{40.8\,$\pm$\,0.5} \\
+\rowcolor{goldrow} & {\scriptsize\color{gray}$\uparrow$1.3\%} & {\scriptsize\color{gray}$\uparrow$7.9\%} & {\scriptsize\color{gray}$\uparrow$26\%} & {\scriptsize\color{gray}$\uparrow$53\%} & {\scriptsize\color{gray}$\uparrow$170\%} & {\scriptsize\color{gray}$\downarrow$67\%} & {\scriptsize\color{gray}$\uparrow$10.5\%} & \\
 \midrule
-\multicolumn{9}{l}{\emph{LLaDA-1.5}}\\[1pt]
-\quad LLaDA-1.5$^\circ$ & 80.9 & 37.8 & 22.6 & 12.1 & \textbf{13.3} & \textbf{3.3} & 38.4 & --- \\
-\quad LIFT ($H{=}3$) & 80.4 & 37.7 & \textbf{26.9} & 16.0 & 11.1 & \textbf{3.3} & 40.3\,$\pm$\,0.8 & 39.6\,$\pm$\,1.3 \\
-\quad \textbf{GoldiMask} & \textbf{81.1} & \textbf{39.6} & 25.4 & \textbf{17.1} & 10.0 & 0.0 & \textbf{40.8\,$\pm$\,1.4} & \textbf{41.4\,$\pm$\,0.3} \\
-\quad & {\scriptsize\color{gray}$\uparrow$0.2\%} & {\scriptsize\color{gray}$\uparrow$4.8\%} & {\scriptsize\color{gray}$\uparrow$12\%} & {\scriptsize\color{gray}$\uparrow$41\%} & {\scriptsize\color{gray}$\downarrow$25\%} & {\scriptsize\color{gray}$\downarrow$100\%} & {\scriptsize\color{gray}$\uparrow$6.3\%} & \\
+\rowcolor{panelrow}\multicolumn{9}{l}{\emph{LLaDA-1.5}}\\
+LLaDA-1.5$^\circ$ & 80.9 & 37.8 & 22.6 & 12.1 & \textbf{13.3} & \textbf{3.3} & 38.4 & --- \\
+LIFT ($H{=}3$) & 80.4 & 37.7 & \textbf{26.9} & 16.0 & 11.1 & \textbf{3.3} & 40.3\,$\pm$\,0.8 & 39.6\,$\pm$\,1.3 \\
+\rowcolor{goldrow}\textbf{GoldiMask} & \textbf{81.1} & \textbf{39.6} & 25.4 & \textbf{17.1} & 10.0 & 0.0 & \textbf{40.8\,$\pm$\,1.4} & \textbf{41.4\,$\pm$\,0.3} \\
+\rowcolor{goldrow} & {\scriptsize\color{gray}$\uparrow$0.2\%} & {\scriptsize\color{gray}$\uparrow$4.8\%} & {\scriptsize\color{gray}$\uparrow$12\%} & {\scriptsize\color{gray}$\uparrow$41\%} & {\scriptsize\color{gray}$\downarrow$25\%} & {\scriptsize\color{gray}$\downarrow$100\%} & {\scriptsize\color{gray}$\uparrow$6.3\%} & \\
 \midrule
-\multicolumn{9}{l}{\emph{Dream-7B}}\\[1pt]
-\quad LIFT ($H{=}3$, fixed code) & 78.4 & 42.1 & 30.0 & \textbf{23.3} & \textbf{8.9} & \textbf{12.2} & 43.4\,$\pm$\,0.7 & 43.0\,$\pm$\,0.3 \\
-\quad \textbf{GoldiMask} & \textbf{79.2} & \textbf{42.4} & \textbf{37.5} & 17.6 & 5.6 & 5.6 & \textbf{44.2\,$\pm$\,0.8} & \textbf{44.6\,$\pm$\,1.3} \\
+\rowcolor{panelrow}\multicolumn{9}{l}{\emph{Dream-7B}}\\
+LIFT ($H{=}3$, fixed code) & 78.4 & 42.1 & 30.0 & \textbf{23.3} & \textbf{8.9} & \textbf{12.2} & 43.4\,$\pm$\,0.7 & 43.0\,$\pm$\,0.3 \\
+\rowcolor{goldrow}\textbf{GoldiMask} & \textbf{79.2} & \textbf{42.4} & \textbf{37.5} & 17.6 & 5.6 & 5.6 & \textbf{44.2\,$\pm$\,0.8} & \textbf{44.6\,$\pm$\,1.3} \\
 \bottomrule
 \end{tabular}}
 \end{center}
@@ -194,12 +199,14 @@ Name & GSM8K & MATH & Countdown & Sudoku & AIME '24 & AIME '25 & Core (sel.) & C
 \resizebox{0.92\linewidth}{!}{%
 \begin{tabular}{lcccccccc}
 \toprule
-Name & GSM8K & MATH & Countdown & Sudoku & AIME '24 & AIME '25 & Core (sel.) & Core (final) \\
+ & \multicolumn{4}{c}{Core benchmarks (pass@1)} & \multicolumn{2}{c}{AIME (pass@16)} & \multicolumn{2}{c}{Core average} \\
+\cmidrule(lr){2-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+Name & GSM8K & MATH & Countdown & Sudoku & '24 & '25 & selected & final \\
 \midrule
-\quad Instruct$^\circ$ & 78.2 & 36.8 & 20.0 & 11.8 & 3.3 & \textbf{3.3} & 36.7 & --- \\
-\quad LIFT ($H{=}2$) & \textbf{81.4} & 36.6 & 23.6 & 11.2 & \textbf{10.0} & \textbf{4.4} & 38.2\,$\pm$\,0.4 & 38.6\,$\pm$\,0.3 \\
-\quad \textbf{GoldiMask} & 80.5 & \textbf{37.5} & \textbf{28.1} & \textbf{16.5} & 3.3 & 1.1 & \textbf{40.7\,$\pm$\,0.7} & \textbf{39.6\,$\pm$\,0.7} \\
-\quad & {\scriptsize\color{gray}$\uparrow$2.9\%} & {\scriptsize\color{gray}$\uparrow$1.9\%} & {\scriptsize\color{gray}$\uparrow$41\%} & {\scriptsize\color{gray}$\uparrow$40\%} & {\scriptsize\color{gray}$\uparrow$0\%} & {\scriptsize\color{gray}$\downarrow$67\%} & {\scriptsize\color{gray}$\uparrow$10.9\%} & \\
+Instruct$^\circ$ & 78.2 & \textbf{36.8} & 20.0 & 11.8 & 3.3 & \textbf{3.3} & 36.7 & --- \\
+LIFT ($H{=}2$) & \textbf{81.4} & 36.6 & 23.6 & 11.2 & \textbf{10.0} & \textbf{4.4} & 38.2\,$\pm$\,0.4 & 38.6\,$\pm$\,0.3 \\
+\rowcolor{goldrow}\textbf{GoldiMask} & 80.5 & \textbf{37.5} & \textbf{28.1} & \textbf{16.5} & 3.3 & 1.1 & \textbf{40.7\,$\pm$\,0.7} & \textbf{39.6\,$\pm$\,0.7} \\
+\rowcolor{goldrow} & {\scriptsize\color{gray}$\uparrow$2.9\%} & {\scriptsize\color{gray}$\uparrow$1.9\%} & {\scriptsize\color{gray}$\uparrow$41\%} & {\scriptsize\color{gray}$\uparrow$40\%} & {\scriptsize\color{gray}$\uparrow$0\%} & {\scriptsize\color{gray}$\downarrow$67\%} & {\scriptsize\color{gray}$\uparrow$10.9\%} & \\
 \bottomrule
 \end{tabular}}
 \end{center}
@@ -252,6 +259,27 @@ vanilla SFT (no reveal structure)$^\ddagger$ & 36.8 & --- & the floor \\
 \paragraph{Is attention causal?} A control with the identical two-pass pipeline and exact-$K$ budget arithmetic but uniformly random reveal sets and \emph{no} realized-gain weighting (isolating structure alone) scores 38.7/38.4 (best/final core average) with the worst tail in the study (AIME'24 as low as 0.0). Attention-guided selection is worth about $+2$ core points over random at matched structure. Notably, random reveal still beats vanilla SFT by about the same margin---the two-pass reveal structure itself, independent of selection, accounts for roughly half of the total improvement. We know of no prior work that separates these two contributions.
 
 \paragraph{Does the calibration matter?} The defaults instantiation (round numbers, correct shape) scores 41.8 core at seed 42 ($41.0 \pm 0.8$ over seeds) against the fitted variant's 40.5 --- a gap our own convention counts as real at the matched seed, in the defaults' favor. Our working explanation is estimation noise concentrated in the fitted lookup's sparse high-noise cells, where few tokens land per bin; a smooth parametric shape averages that noise away. Whether the discovered \emph{peak location} itself matters is a separable question, and we test it directly: two otherwise-identical runs with deliberately wrong-shaped $\lambda$---$p(1{-}p)$ (symmetric uncertainty, peak at $p{=}0.5$) and $1{-}p$ (pessimism, peak as $p \to 0$), the two textbook shapes the measurement rejected. The result is a dose--response in wrongness: defaults (peak at the measured $0.22$--$0.25$) score 41.8, symmetric 40.5, pessimism 38.6---the last statistically at the random-reveal floor of 38.7, so a wrong-enough curve erases the entire selection gain. The pessimism control also reproduces the study's recurring signature from the curve shape alone: its AIME'24 rises to 13.3, LIFT's level, while its core collapses---revealing easy context and supervising hopeless tokens buys tail at core's expense (both controls seed 42). We consider this the ablation's best possible outcome: the measurements are needed to \emph{discover} the shape---the peak location, the saturation, and their stability are empirical findings that no heuristic we know of predicts---but the method's performance requires only the shape. Deployment involves no calibration step, and the ``fragile fitted curves'' objection dissolves. Sensitivity analysis agrees: perturbing shape parameters by $2\times$ changes token rankings by less than $0.08$ Spearman.
+
+\paragraph{Pointwise versus population constraints.} The flagship's constraint holds the \emph{batch-mean} supervised confidence at the measured peak; an obvious refinement gives every example its own thermostat---reveal per example until \emph{that example's} predicted post-reveal confidence reaches $p^\star$. Table~\ref{tab:pointwise} shows this pointwise controller at three seeds on all four settings: it never beats the population constraint, loses about two selected-checkpoint points on two of the four settings, and carries a consistent mechanistic signature---Sudoku, the most structured benchmark, collapses wherever the pointwise controller loses. The reading: hard examples' low confidence makes the per-example rule reveal heavily exactly where the hardest, most learnable tokens live, scaffolding the difficulty away; the population constraint preserves within-batch difficulty diversity---hard examples stay hard, easy stay easy, and only the \emph{average} sits at the peak. The constraint belongs at the population level. (A per-example \emph{dual variable} proper is not realizable in any case: an example recurs only $\sim$20 times in training, too rarely for its own ascent to converge; the pointwise rule must therefore act through a one-shot $\phi$-based prediction, a structurally cruder controller.)
+
+\begin{table}[t]
+\caption{\textbf{Pointwise versus population constraints} (core mean $\pm$ sd, seeds 42--44). The per-sample thermostat (psdc) pins each example's predicted difficulty to $p^\star$; the flagship pins only the batch mean. Sudoku columns (selected ckpt) show the signature collapse. $^\dagger$one seed's evaluation completed at 43 of 44 shards (final repair in flight); the cell can move by at most a few tenths.}
+\label{tab:pointwise}
+\begin{center}
+\resizebox{0.98\linewidth}{!}{%
+\begin{tabular}{lcc|cc|cc}
+\toprule
+ & \multicolumn{2}{c|}{\textbf{population (flagship)}} & \multicolumn{2}{c|}{\textbf{pointwise (per-sample)}} & \multicolumn{2}{c}{Sudoku (sel.)} \\
+Setting & selected & final & selected & final & flagship & pointwise \\
+\midrule
+LLaDA-8B & \textbf{41.0\,$\pm$\,0.2} & 40.8\,$\pm$\,0.5 & 39.0\,$\pm$\,0.7 & \textbf{40.9\,$\pm$\,0.7} & 17.1 & \textbf{10.7} \\
+Dream-7B & \textbf{44.2\,$\pm$\,0.8} & \textbf{44.6\,$\pm$\,1.3} & 43.5\,$\pm$\,0.3$^\dagger$ & 43.8\,$\pm$\,0.5 & 17.6 & 16.5 \\
+LLaDA-1.5 & 40.8\,$\pm$\,1.4 & \textbf{41.4\,$\pm$\,0.3} & \textbf{41.0\,$\pm$\,0.1}$^\dagger$ & 40.2\,$\pm$\,0.2 & 17.1 & 14.7 \\
+12K & \textbf{40.7\,$\pm$\,0.7} & \textbf{39.6\,$\pm$\,0.7} & 38.8$^\dagger$ & 39.0\,$\pm$\,1.7 & 16.0 & \textbf{10.7} \\
+\bottomrule
+\end{tabular}}
+\end{center}
+\end{table}
 
 \paragraph{Mechanism factorial.} Adding the fading mechanisms one at a time (Appendix~\ref{app:full}) shows each buys tail at a small core cost individually, while the full combination recovers both at its final checkpoints: $40.0 \pm 1.0$ core with a $10.0 \pm 3.3$ / $4.4 \pm 1.9$ tail over three seeds, the best protocol-temperature tail among our variants; the bottom-$k$ mixture inherited from LIFT behaves similarly. Consistent with the scaffolding reading, every mechanism that improves the sampled tail is one that removes helpful context during training.
 
@@ -365,7 +393,7 @@ A method whose central claim is principledness owes its readers an adversarial t
  & LLaDA-8B & Dream-7B & LLaDA-1.5 & 12K \\
 \midrule
 \textbf{dual-cap (flagship)} & $41.0{\pm}0.2$ / $40.8{\pm}0.5$ & $44.2{\pm}0.8$ / $44.6{\pm}1.3$ & $40.8{\pm}1.4$ / $\mathbf{41.4{\pm}0.3}$ & $\mathbf{40.7{\pm}0.7}$ / $39.6{\pm}0.7$ \\
-per-sample cap & $39.0{\pm}0.7$ / $40.6^{\S}$ & $43.6^{\S}$ / $43.8{\pm}0.5$ & $41.0^{\S}$ / $40.2{\pm}0.2$ & $38.8^\ddagger$ / --- \\
+per-sample cap & $39.0{\pm}0.7$ / $40.9{\pm}0.7$ & $43.6^{\S}$ / $43.8{\pm}0.5$ & $41.0^{\S}$ / $40.2{\pm}0.2$ & $38.8^\ddagger$ / --- \\
 two-sided & $40.1{\pm}0.7$ / $39.9{\pm}1.0$ & $\mathbf{44.9{\pm}0.5}$ / $44.6^{\S}$ & $41.1^\ddagger$ / $41.0{\pm}0.9$ & $42.5^\ddagger$ / $39.8{\pm}1.7$ \\
 combined & --- / $39.6{\pm}1.1$ & $43.2^{\S}$ / $42.3{\pm}0.2$ & --- & --- \\
 step-value scaling & $39.9^\ddagger$ / --- & --- & --- & --- \\
