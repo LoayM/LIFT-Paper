@@ -120,13 +120,25 @@ the predicted benefit of revealing $R$ (whose size is set by the budget of Secti
 \subsection{Loss weighting: realized gain, fairly allocated}
 \label{sec:weighting}
 
-Selection uses \emph{predicted} learning; the loss weighting uses \emph{realized} learning. After the second (supervised) pass, each still-masked token has two probabilities for its gold label: $p_1$ from the heavily-masked first pass and $p_2$ after the chosen context was revealed. Token $i$'s utility is
+Selection chose the reveals using \emph{predicted} benefit; by the end of the supervised pass, that prediction has been checked by reality, and the loss should spend the information. For each supervised token, the two passes provide its confidence before the reveals ($p_1$) and after ($p_2$), and we grade by demonstrated progress:
 \begin{equation}
-u_i \;=\; \max(\log p_2^{(i)} - \log p_1^{(i)},\, 0) \cdot \lambda(p_2^{(i)}, t):
+u_i \;=\; \max(\log p_2^{(i)} - \log p_1^{(i)},\, 0) \cdot \lambda(p_2^{(i)}).
 \end{equation}
-the gain factor credits tokens the scaffolding demonstrably helped; the $\lambda$ factor spends that credit only where more teaching is worthwhile. One quantity, used twice: predicted to build the corruption, measured to allocate the gradient.
+The first factor credits tokens the revealed evidence demonstrably engaged. The second---the same measured curve, now evaluated at the \emph{post-reveal} confidence---declines to pay for exercises the reveals already solved: a token pushed to near-certainty has nothing left to teach, however large its jump. Weight therefore flows to tokens the evidence moved \emph{into} the teachable zone and no further.
 
-Utilities become weights by \emph{water-filling}: the weights solve $\sum_i w_i = n$ with $0 \le w_i \le c$, taking $w_i = \min(u_i/\nu,\ c)$, where the water level $\nu$ is set by bisection so the budget holds exactly and the hogging cap is $c{=}10$ (template and formatting tokens occasionally exhibit enormous nominal gains; the cap and the $\lambda$ factor both suppress them). This is not a heuristic smoothing: Proposition~\ref{prop:waterfill} shows these weights are the \emph{unique} maximizer of the utility-weighted proportional-fairness objective $\sum_i u_i \log w_i$ on the budget polytope---the Nash-bargaining allocation of a fixed amount of gradient across the batch's supervised tokens---and Corollary~\ref{cor:ess} records the resulting floor on the effective number of supervised tokens. Tokens compete for gradient; when many are useful the level rises and each receives less, and no token can absorb more than $c$ shares. (A simpler mean-normalize-then-clip rule is the ablation baseline of Table~\ref{tab:ablations}; it answers no stated allocation question and costs $+1.6$ core points under scarce reveals.) One question now remains, and it is the one every corruption-design method before ours has answered by fiat: how much help should a lesson contain?
+Utilities must then become weights, and three requirements pin the conversion down. The weights must sum to exactly $n$, so that reweighting redistributes the step's gradient without changing its size---and hence leaves the effective learning rate untouched. No token may exceed a cap $c$ ($c{=}10$ throughout): template and formatting tokens occasionally exhibit enormous nominal gains and must not absorb the step. And subject to both, weight should follow measured merit. \emph{Water-filling} is not one option among many here; it is the unique rule satisfying all three requirements simultaneously:
+\begin{equation}
+w_i \;=\; \min\!\big(u_i/\nu,\; c\big), \qquad \nu \text{ such that } \textstyle\sum_i w_i = n,
+\end{equation}
+with the level $\nu$ found by a one-dimensional bisection. (The obvious alternative---normalize, then clip, as in early versions of our own method---violates the first requirement whenever the clip binds; the ablation in Table~\ref{tab:ablations} prices that failure at $1.6$ core points under scarce reveals.)
+
+Two results make the construction precise; formal statements and proofs are in Appendix~\ref{app:theory}.
+
+\emph{Proposition~\ref{prop:waterfill} (fair allocation, informal).} Among all weight vectors with total $n$ and per-token cap $c$, the water-filling weights are the unique maximizer of the proportional-fairness objective $\sum_i u_i \log w_i$---equivalently, the Nash bargaining solution in which tokens bargain for the step's gradient with power equal to their measured utility.
+
+\emph{Corollary~\ref{cor:ess} (participation floor, informal).} Under any weights respecting the cap, the effective number of tokens receiving gradient never falls below $n/c$.
+
+The theory earns its place operationally. Budget exactness keeps every comparison in Section~\ref{sec:experiments} at a fixed effective learning rate; uniqueness means the weighting carries no tuning surface---it is the answer to a stated allocation problem, not a smoothing heuristic with settings; and the participation floor guarantees the gradient can never silently concentrate on a handful of freak tokens. One question now remains---the one every corruption-design method before ours has answered by fiat: how much help should a lesson contain?
 
 \subsection{The budget: a constraint on measured difficulty}
 \label{sec:lagrangian}
